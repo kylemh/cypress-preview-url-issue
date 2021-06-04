@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  deployment_status:
+    branches-ignore:
+      - main
+
+jobs:
+  Cypress:
+    if: github.event.deployment_status.state == 'success' && startsWith(github.event.deployment_status.target_url, 'https://cypress-preview-issue')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print URL
+        run: echo Testing URL ${{ github.event.deployment_status.target_url }}
+
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Read .nvmrc
+        run: echo ::set-output name=NVMRC::$(cat .nvmrc)
+        id: nvm
+
+      - name: Use Node with version in .nvmrc
+        uses: actions/setup-node@v2
+        with:
+          always-auth: true
+          registry-url: https://registry.npmjs.org
+          node-version: '${{ steps.nvm.outputs.NVMRC }}'
+
+      - name: Install dependencies
+        run: yarn --non-interactive --frozen-lockfile --silent
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Run Cypress
+        uses: cypress-io/github-action@v2
+        with:
+          install: false
+          command: 'yarn cypress run --config baseUrl=${{ github.event.deployment_status.target_url }}'
+          parallel: true
